@@ -224,10 +224,15 @@ def get_metrics(
     freshness_minutes = 0
 
     if latest_event:
+        event_time = latest_event.timestamp
+
+        if event_time.tzinfo is not None:
+            event_time = event_time.replace(tzinfo=None)
+
         freshness_minutes = int(
             (
-                datetime.now(timezone.utc)
-                - latest_event.timestamp
+                datetime.utcnow()
+                - event_time
             ).total_seconds()
             / 60
         )

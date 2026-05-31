@@ -12,6 +12,20 @@ from datetime import datetime, timezone
 
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 
+from typing import Any, Dict, List
+from pydantic import BaseModel, Field
+
+
+class EventIngestionRequest(BaseModel):
+    """
+    Request model for batch event ingestion.
+    """
+
+    events: List[Dict[str, Any]] = Field(
+        ...,
+        max_length=500,
+        description="Batch of CCTV events"
+    )
 
 class EventType(str, Enum):
     """Enumeration of supported event types."""

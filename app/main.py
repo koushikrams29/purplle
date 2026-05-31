@@ -26,10 +26,15 @@ from sqlalchemy.orm import Session
 from app.models import EventIngestionRequest
 from app.database import get_db
 from app.ingestion import ingest_events
+from app.logging_config import (
+    setup_logging,
+    LoggingMiddleware,
+)
 
 
 # Initialize database
 init_db()
+setup_logging()
 
 # Create FastAPI app
 tags_metadata = [
@@ -62,25 +67,14 @@ app = FastAPI(
     debug=settings.debug,
     openapi_tags=tags_metadata
 )
+
+app.add_middleware(
+    LoggingMiddleware
+)
+
 logger = logging.getLogger(__name__)
 
-@app.middleware("http")
-async def log_requests(
-    request: Request,
-    call_next
-):
-    logger.info(
-        f"{request.method} {request.url.path}"
-    )
 
-    response = await call_next(request)
-
-    logger.info(
-        f"{request.method} {request.url.path} "
-        f"-> {response.status_code}"
-    )
-
-    return response
 
 @app.on_event("startup")
 async def startup_event():

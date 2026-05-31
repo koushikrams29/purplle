@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
-
+from datetime import datetime,timezone
 from app.main import app
 from app.database import Base
 
@@ -53,6 +53,8 @@ def client(db):
     with TestClient(app) as test_client:
         yield test_client
 
+    app.dependency_overrides.clear()
+
 
 @pytest.fixture(scope="function")
 def sample_event():
@@ -63,12 +65,16 @@ def sample_event():
         "camera_id": "CAM_ENTRY_01",
         "visitor_id": "VIS_000001",
         "event_type": "ENTRY",
-        "timestamp": "2026-03-03T14:00:00Z",
-        "zone_id": None,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "zone_id": "ENTRY",
         "dwell_ms": 0,
         "is_staff": False,
         "confidence": 0.95,
-        "metadata": {}
+        "metadata": {
+                "queue_depth": None,
+                "sku_zone": None,
+                "session_seq": 1
+            }
     }
 
 

@@ -37,6 +37,8 @@ def get_db():
 
 def init_db():
     """Initialize database"""
+    from app import db_models
+
     Base.metadata.create_all(bind=engine)
 
 

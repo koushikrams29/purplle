@@ -7,6 +7,12 @@ from fastapi import FastAPI
 from datetime import datetime
 from app.config import settings
 from app.database import init_db
+from typing import List, Dict, Any
+from fastapi import Depends, HTTPException
+from sqlalchemy.orm import Session
+
+from app.database import get_db
+from app.ingestion import ingest_events
 
 # Initialize database
 init_db()
@@ -56,8 +62,48 @@ async def root():
         "health": "/health"
     }
 
+@app.post("/events/ingest")
+async def ingest_events_endpoint(
+    events: List[Dict[str, Any]],
+    db: Session = Depends(get_db)
+):
+    """
+    Ingest CCTV-generated events.
+
+    Supports:
+    - Batch ingestion (max 500)
+    - Duplicate detection
+    - Partial success handling
+    - Visitor session creation/update
+    """
+
+    try:
+        ingested_count, failed_events = ingest_events(
+            event_list=events,
+            db_session=db
+        )
+
+        return {
+            "status": "ok",
+            "ingested": ingested_count,
+            "failed": len(failed_events),
+            "errors": failed_events,
+        }
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc)
+        )
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Ingestion failed: {str(exc)}"
+        )
 
 if __name__ == "__main__":
+
     import uvicorn
     uvicorn.run(
         app,

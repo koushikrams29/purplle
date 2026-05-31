@@ -1,0 +1,39 @@
+version: '3.9'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: store-intelligence-api
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite:///./store.db
+      - ENVIRONMENT=production
+      - DEBUG=False
+      - YOLO_MODEL=yolov8m
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./store.db:/app/store.db
+      - ./events:/app/events
+      - ./data:/app/data
+      - ./logs:/app/logs
+    command: >
+      sh -c "
+      python -c 'from app.database import init_db; init_db()' &&
+      uvicorn app.main:app --host 0.0.0.0 --port 8000
+      "
+    networks:
+      - store-intel-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+networks:
+  store-intel-network:
+    driver: bridge

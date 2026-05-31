@@ -1,0 +1,42 @@
+{
+  "store_id": "STORE_BLR_002",
+  "store_name": "Brigade Road - Bangalore",
+  "city": "Bangalore",
+  "address": "Brigade Road, Bangalore",
+  "zones": {
+    "ENTRY": {
+      "name": "Entry/Exit Threshold",
+      "polygon": [[100, 50], [150, 50], [150, 100], [100, 100]]
+    },
+    "MAIN_FLOOR": {
+      "name": "Main Shopping Floor",
+      "polygon": [[200, 100], [800, 100], [800, 500], [200, 500]]
+    },
+    "SKINCARE": {
+      "name": "Skincare Zone",
+      "polygon": [[200, 150], [400, 150], [400, 300], [200, 300]]
+    },
+    "MAKEUP": {
+      "name": "Makeup Zone",
+      "polygon": [[450, 150], [600, 150], [600, 300], [450, 300]]
+    },
+    "BILLING": {
+      "name": "Billing Counter Area",
+      "polygon": [[600, 350], [800, 350], [800, 500], [600, 500]]
+    }
+  },
+  "cameras": {
+    "CAM_ENTRY_01": {
+      "name": "Entry/Exit Camera",
+      "zones": ["ENTRY"]
+    },
+    "CAM_MAIN_FLOOR_01": {
+      "name": "Main Floor Camera",
+      "zones": ["MAIN_FLOOR", "SKINCARE", "MAKEUP", "BILLING"]
+    },
+    "CAM_BILLING_01": {
+      "name": "Billing Area Camera",
+      "zones": ["BILLING"]
+    }
+  }
+}

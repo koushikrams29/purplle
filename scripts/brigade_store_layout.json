@@ -1,0 +1,84 @@
+{
+  "store_id": "STORE_BLR_002",
+  "store_name": "Brigade Road - Bangalore",
+  "city": "Bangalore",
+
+  "zones": {
+    "ENTRY": {
+      "name": "Store Entrance",
+      "polygon": [
+        [0, 0],
+        [1920, 0],
+        [1920, 1080],
+        [0, 1080]
+      ]
+    },
+
+    "BILLING": {
+      "name": "Billing Counter",
+      "polygon": [
+        [0, 0],
+        [1920, 0],
+        [1920, 1080],
+        [0, 1080]
+      ]
+    },
+
+    "MAKEUP": {
+      "name": "Makeup Zone",
+      "polygon": [
+        [0, 0],
+        [1920, 0],
+        [1920, 1080],
+        [0, 1080]
+      ]
+    },
+
+    "SKINCARE": {
+      "name": "Skincare Zone",
+      "polygon": [
+        [0, 0],
+        [1920, 0],
+        [1920, 1080],
+        [0, 1080]
+      ]
+    },
+
+    "BACKROOM": {
+      "name": "Stock Room",
+      "polygon": [
+        [0, 0],
+        [1920, 0],
+        [1920, 1080],
+        [0, 1080]
+      ]
+    }
+  },
+
+  "cameras": {
+  "CAM_SKINCARE_01": {
+    "name": "Skincare Camera",
+    "zones": ["SKINCARE"]
+  },
+
+  "CAM_MAKEUP_02": {
+    "name": "Makeup Camera",
+    "zones": ["MAKEUP"]
+  },
+
+  "CAM_ENTRY_03": {
+    "name": "Entrance Camera",
+    "zones": ["ENTRY"]
+  },
+
+  "CAM_BACKROOM_04": {
+    "name": "Backroom Camera",
+    "zones": ["BACKROOM"]
+  },
+
+  "CAM_BILLING_05": {
+    "name": "Billing Camera",
+    "zones": ["BILLING"]
+  }
+}
+}

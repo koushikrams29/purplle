@@ -324,7 +324,9 @@ class CentroidTracker:
                 track.frame_idx = frame_idx
                 track.frames_since_last_detection = 0
                 
+
                 # Update zone tracking
+                previous_zone = track.last_zone
                 zone_id = zones[det_idx]
                 if zone_id:
                     if zone_id not in track.frames_in_zone:
@@ -339,6 +341,20 @@ class CentroidTracker:
                             "zone_id": zone_id
                         }
                     
+                    if (
+                        previous_zone
+                        and zone_id
+                        and previous_zone != zone_id
+                    ):
+                        events[f"{best_track_id}_zone_exit"] = {
+                            "event": "ZONE_EXIT",
+                            "zone_id": previous_zone
+                        }
+
+                        events[f"{best_track_id}_zone_enter"] = {
+                            "event": "ZONE_ENTER",
+                            "zone_id": zone_id
+                        }
                     track.last_zone = zone_id
         
         # Register new tracks for unmatched detections
@@ -423,10 +439,10 @@ class StoreDetector:
     PERSON_CLASS_ID = 0
     
     # Default frame extraction rate (frames per second to process)
-    DEFAULT_FPS_SAMPLE = 1
+    DEFAULT_FPS_SAMPLE = 30
     
     # Dwell time threshold (frames at ~1 FPS = seconds)
-    DWELL_THRESHOLD_FRAMES = 30
+    DWELL_THRESHOLD_SECONDS = 30
     
     # Billing queue detection parameters
     QUEUE_ZONE = "BILLING"
@@ -457,7 +473,7 @@ class StoreDetector:
         """
         try:
             logger.info(f"Loading YOLOv8 {model_name} on {device}")
-            self.model = YOLO(f"yolov8{model_name[0]}.pt")
+            self.model = YOLO(f"{model_name}.pt")
             self.model.to(device)
             self.device = device
         except Exception as e:
@@ -476,7 +492,11 @@ class StoreDetector:
         self.visitor_zone_entry_frame: Dict[str, Dict[str, int]] = {}
         self.billing_queue_join_frame: Dict[str, int] = {}
     
-    def setup_zones(self, store_layout: Dict) -> None:
+    def setup_zones(
+    self,
+    store_layout: Dict,
+    camera_id: str
+    ) -> None:
         """
         Setup zone mapper from store layout.
         
@@ -489,13 +509,18 @@ class StoreDetector:
         if "zones" not in store_layout:
             raise ValueError("store_layout must contain 'zones' key")
         
+        camera_zones = store_layout["cameras"][camera_id]["zones"]
+
         zones = {
-            zone_id: data["polygon"]
-            for zone_id, data in store_layout["zones"].items()
+            zone_id: store_layout["zones"][zone_id]["polygon"]
+            for zone_id in camera_zones
         }
         
         self.zone_mapper = ZoneMapper(zones)
-        logger.info(f"Initialized {len(zones)} zones: {list(zones.keys())}")
+        logger.info(
+            f"Camera {camera_id} initialized "
+            f"{len(zones)} zones: {list(zones.keys())}"
+        )
     
     @staticmethod
     def _extract_frames_cv2(
@@ -574,11 +599,21 @@ class StoreDetector:
         for frame_idx, frame in enumerate(frames):
             results = self.model(
                 frame,
-                conf=self.confidence_threshold,
-                classes=[self.PERSON_CLASS_ID],
+                conf=0.25,
                 verbose=False
             )
-            
+            if frame_idx == 0:
+
+                logger.info(
+                    f"Boxes detected: "
+                    f"{0 if results[0].boxes is None else len(results[0].boxes)}"
+                )
+
+                if results[0].boxes is not None:
+                    logger.info(
+                        f"Classes found: "
+                        f"{results[0].boxes.cls.cpu().numpy().tolist()}"
+                    )
             detections = []
             
             if results and len(results) > 0:
@@ -596,6 +631,14 @@ class StoreDetector:
                         detections.append((float(cx), float(cy)))
             
             all_detections.append(detections)
+
+        
+
+            if frame_idx < 20:
+                logger.info(
+                    f"Frame {frame_idx + 1}: "
+                    f"{len(detections)} person detections"
+                )
             
             if (frame_idx + 1) % 10 == 0:
                 logger.debug(
@@ -625,9 +668,16 @@ class StoreDetector:
         
         for detection_list in detections:
             zones = []
+
             for cx, cy in detection_list:
                 zone_id = self.zone_mapper.classify_point(cx, cy)
+
+                logger.info(
+                    f"Point ({int(cx)}, {int(cy)}) -> Zone {zone_id}"
+                )
+
                 zones.append(zone_id)
+
             all_zones.append(zones)
         
         return all_zones
@@ -669,7 +719,9 @@ class StoreDetector:
             frames_in_zone = track.frames_in_zone[zone_id]
             
             # Check if exceeded dwell threshold
-            if frames_in_zone >= self.DWELL_THRESHOLD_FRAMES:
+            dwell_threshold_frames = fps * self.DWELL_THRESHOLD_SECONDS
+
+            if frames_in_zone >= dwell_threshold_frames:
                 # Check if we haven't emitted dwell for this zone yet
                 if visitor_id not in self.visitor_zone_entry_frame:
                     self.visitor_zone_entry_frame[visitor_id] = {}
@@ -807,7 +859,7 @@ class StoreDetector:
             ValueError: If store_layout is invalid
         """
         # Setup
-        self.setup_zones(store_layout)
+        self.setup_zones(store_layout,camera_id)
         self.tracker.reset()
         self.session_seq.clear()
         self.visitor_zone_entry_frame.clear()
@@ -845,7 +897,11 @@ class StoreDetector:
                     frame_zones,
                     frame_idx
                 )
-                
+                logger.info(
+                    f"Frame {frame_idx}: "
+                    f"tracker returned {len(track_events)} events"
+                )
+
                 # Convert track events to VisitorEvent
                 for visitor_id, event_info in track_events.items():
                     if event_info["event"] == "ENTRY":
@@ -892,12 +948,56 @@ class StoreDetector:
                         )
                         
                         events.append(event)
+                    
+                    elif event_info["event"] == "ZONE_ENTER":
+                        timestamp = timestamp_start + timedelta(
+                            seconds=(frame_idx / (fps / fps_sample))
+                        )
+
+                        event = VisitorEvent(
+                            store_id=store_id,
+                            camera_id=camera_id,
+                            visitor_id=visitor_id,
+                            event_type=EventType.ZONE_ENTER,
+                            timestamp=timestamp,
+                            zone_id=event_info["zone_id"],
+                            confidence=0.90,
+                            metadata=EventMetadata(
+                                session_seq=self.session_seq.get(visitor_id, 1)
+                            )
+                        )
+
+                        events.append(event)
+
+                    elif event_info["event"] == "ZONE_EXIT":
+                        timestamp = timestamp_start + timedelta(
+                            seconds=(frame_idx / (fps / fps_sample))
+                        )
+
+                        event = VisitorEvent(
+                            store_id=store_id,
+                            camera_id=camera_id,
+                            visitor_id=visitor_id,
+                            event_type=EventType.ZONE_EXIT,
+                            timestamp=timestamp,
+                            zone_id=event_info["zone_id"],
+                            confidence=0.90,
+                            metadata=EventMetadata(
+                                session_seq=self.session_seq.get(visitor_id, 1)
+                            )
+                        )
+
+                        events.append(event)
                 
                 # Detect dwell events
+                logger.info(
+                    f"DEBUG: fps={fps}, fps_sample={fps_sample}, "
+                    f"fps//fps_sample={fps // fps_sample}"
+                )
                 dwell_events = self._detect_dwell_events(
                     frame_idx,
                     len(detections),
-                    fps // fps_sample,
+                    fps,
                     store_id,
                     camera_id,
                     timestamp_start
@@ -907,7 +1007,7 @@ class StoreDetector:
                 # Detect queue events
                 queue_events = self._detect_queue_events(
                     frame_idx,
-                    fps // fps_sample,
+                    fps,
                     store_id,
                     camera_id,
                     timestamp_start

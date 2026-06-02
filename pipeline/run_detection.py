@@ -350,7 +350,7 @@ Examples:
             camera_id=args.camera_id,
             store_layout=store_layout
         )
-        
+        print(f"\nDEBUG: detector returned {len(events)} events\n")
         # Validate events
         valid_events = []
         invalid_events = []
